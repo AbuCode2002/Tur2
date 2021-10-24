@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Список учеников</title>
+    <script type="text/javascript" src="jquery.js"></script>
+    <meta name="Окно просмотра" content="user-scalable=no,width=device-width" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+        integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+</head>
+
+<body style="margin:30px">
+
+    <div class="container">
+
+        <div class="row">
+            <form>
+                <fieldset>
+                    <legend class="display-4">ФИО</legend>
+                    <input type="text" class="form-control" name="" id="item">
+
+                    <legend class="display-4">Id</legend>
+                    <input type="number" class="form-control" id="quantity" name="">
+                    <br>
+                    <button type="button" id="insert" class="btn btn-outline-primary">Вставить</button>
+
+                    <button type="button" id="create" class="btn btn-outline-primary">Создать таблицу</button>
+
+                    <button type="button" id="remove" class="btn btn-outline-dark">Удалить таблицу</button>
+
+                    <button type="button" id="list" class="btn btn-outline-primary">Вывод таблицы</button>
+                    <p><small><b>Примечание:</b> Таблица должна быть создана сначала перед вставкой или выполнением
+                            какой-либо
+                            транзакции</small></p>
+                </fieldset>
+            </form>
+
+            <hr>
+            <br>
+
+            <table class="table table-bordered table-hover" id="itemlist">
+
+            </table>
+
+
+
+
+        </div>
+
+    </div>
+
+
+
+    <script type="text/javascript">
+
+        var db = openDatabase("itemDB", "1.0", "itemDB", 65535); // itemDB - это имя базы данных
+
+
+        $(function () {
+
+            loadData(); //загрузка записей
+
+
+
+            //СОЗДАНИЕ ТАБЛИЦЫ НАЧИНАЕТСЯ ЗДЕСЬ
+
+            $("#create").click(function () {
+                db.transaction(function (transaction) {
+                    var sql = "CREATE TABLE items " +
+                        "(id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT," +
+                        "item VARCHAR(100) NOT NULL," +
+                        "quantity INT(5) NOT NULL)";
+                    transaction.executeSql(sql, undefined, function () {
+                        alert("Таблица успешно создана!");
+                    }, function () {
+                        alert("Таблица уже создана!");
+                    })
+                });
+            });
+
+
+
+            //УДАЛЕНИЕ ТАБЛИЦЫ НАЧИНАЕТСЯ ЗДЕСЬ
+            $("#remove").click(function () {
+
+                if (!confirm("Вы уверены, что хотите удалить эту таблицу?", "")) return;;
+                db.transaction(function (transaction) {
+                    var sql = "DROP TABLE items";
+                    transaction.executeSql(sql, undefined, function () {
+                        alert("Таблица успешно удалена")
+                    }, function (transaction, err) {
+                        alert(err.message);
+                    })
+                });
+            });
+
+
+            //ВСТАВКА ДАННЫХ В ТАБЛИЦУ
+
+            $("#insert").click(function () {
+                var item = $("#item").val();
+                var qty = $("#quantity").val();
+                db.transaction(function (transaction) {
+                    var sql = "INSERT INTO items(item,quantity) VALUES(?,?)";
+                    transaction.executeSql(sql, [item, qty], function () {
+                        alert("Новый элемент успешно добавлен");
+                    }, function (transaction, err) {
+                        alert(err.message);
+                    })
+                })
+            })
+
+
+            $("#list").click(function () {
+                loadData();
+            })
+
+
+
+            function loadData() {
+                $("#itemlist").children().remove();
+                db.transaction(function (transaction) {
+                    var sql = "SELECT * FROM items ORDER BY id DESC";
+                    transaction.executeSql(sql, undefined, function (transaction, result) {
+                        if (result.rows.length) {
+
+                            for (var i = 0; i < result.rows.length; i++) {
+                                var row = result.rows.item(i);
+                                var item = row.item;
+                                var id = row.id;
+                                var quantity = row.quantity;
+                                $("#itemlist").append('<tr id="del' + id + '"><td>' + id + '</td><td>' + item + '</td><td id="newqty' + id + '">' + quantity + '</td><td><a href="#" class="btn btn-danger deleteitem" data-id="' + id + '">Delete</a> <a href="#" class="btn btn-primary updateitem" data-id="' + id + '">Update</a></td></tr>');
+                            }
+                        } else {
+                            $("#itemlist").append('<tr><td colspan="3" align="center">No Item Found</td></tr>');
+                        }
+                    }, function (transaction, err) {
+                        alert('Примечание. Чтобы создать таблицу сейчас нажмите Создать таблицу');
+                    })
+                })
+
+
+
+                // setTimeout использовался для выполнения внутри него кодов, которые будут загружены после загрузки/извлечения записей.
+
+                setTimeout(function () {
+                    $(".deleteitem").click(function () {
+                        var sure = confirm("Вы уверены, что хотите удалить этот элемент?");
+                        if (sure === true) {
+                            var id = $(this).data("id");
+                            db.transaction(function (transaction) {
+                                var sql = "DELETE FROM items where id=?";
+                                transaction.executeSql(sql, [id], function () {
+                                    $("#del" + id).fadeOut();
+                                    alert("Элемент успешно удален");
+                                }, function (transaction, err) {
+                                    alert(err.message);
+                                })
+                            });
+                        }
+                    })
+
+                    $(".updateitem").click(function () {
+                        var qty = prompt("Пожалуйста, введите новое число", 1);
+                        if (qty !== null) {
+                            var id = $(this).data("id");
+                            db.transaction(function (transaction) {
+                                var sql = "UPDATE items SET quantity=? where id=?";
+                                transaction.executeSql(sql, [qty, id], function () {
+                                    $("#newqty" + id).html(qty);
+                                    alert("Элемент успешно обновлен");
+                                }, function (transaction, err) {
+                                    alert(err.message);
+                                })
+                            });
+                        }
+                    })
+
+                }, 1000);
+
+
+            }
+
+        });
+
+    </script>
+</body>
+
+</html>
